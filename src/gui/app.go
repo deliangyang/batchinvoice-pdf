@@ -5,6 +5,7 @@ import (
 	"batchinvoice-pdf/src/utils"
 	"bytes"
 	"fmt"
+	"image/color"
 	"image/png"
 	"log"
 	"strconv"
@@ -14,7 +15,9 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"fyne.io/fyne/v2/driver/desktop"
 )
 
 // MainWindow 主窗口
@@ -34,6 +37,117 @@ type MainWindow struct {
 	extractionResult *core.ExtractionResult
 	qrCodeCache      map[string]fyne.CanvasObject // 缓存生成的二维码图片
 }
+
+// HoverTableCell 带鼠标悬停高亮效果的表格单元格
+type HoverTableCell struct {
+	widget.BaseWidget
+	content fyne.CanvasObject
+	bg      *canvas.Rectangle
+}
+
+func NewHoverTableCell() *HoverTableCell {
+	cell := &HoverTableCell{}
+	cell.ExtendBaseWidget(cell)
+	return cell
+}
+
+// SetContent 设置单元格内部内容
+func (c *HoverTableCell) SetContent(obj fyne.CanvasObject) {
+	c.content = obj
+	c.Refresh()
+}
+
+// 鼠标移入
+func (c *HoverTableCell) MouseIn(_ *desktop.MouseEvent) {
+	c.setHover(true)
+}
+
+// 鼠标移出
+func (c *HoverTableCell) MouseOut() {
+	c.setHover(false)
+}
+
+// 鼠标移动（这里不需要处理）
+func (c *HoverTableCell) MouseMoved(_ *desktop.MouseEvent) {}
+
+func (c *HoverTableCell) setHover(hover bool) {
+	if c.bg == nil {
+		return
+	}
+
+	if hover {
+		c.bg.FillColor = theme.PrimaryColor()
+		// 仅当内容是文本时才改成白色
+		if txt, ok := c.content.(*canvas.Text); ok {
+			txt.Color = color.White
+		}
+	} else {
+		c.bg.FillColor = color.Transparent
+		if txt, ok := c.content.(*canvas.Text); ok {
+			txt.Color = theme.ForegroundColor()
+		}
+	}
+	c.Refresh()
+}
+
+// CreateRenderer 创建渲染器
+func (c *HoverTableCell) CreateRenderer() fyne.WidgetRenderer {
+	c.bg = canvas.NewRectangle(color.Transparent)
+	return &hoverTableCellRenderer{cell: c}
+}
+
+type hoverTableCellRenderer struct {
+	cell *HoverTableCell
+}
+
+func (r *hoverTableCellRenderer) Layout(size fyne.Size) {
+	if r.cell.bg != nil {
+		r.cell.bg.Resize(size)
+		r.cell.bg.Move(fyne.NewPos(0, 0))
+	}
+	if r.cell.content != nil {
+		min := r.cell.content.MinSize()
+		// 居中显示内容
+		r.cell.content.Resize(min)
+		r.cell.content.Move(fyne.NewPos(
+			(size.Width-min.Width)/2,
+			(size.Height-min.Height)/2,
+		))
+	}
+}
+
+func (r *hoverTableCellRenderer) MinSize() fyne.Size {
+	if r.cell.content != nil {
+		return r.cell.content.MinSize()
+	}
+	return fyne.NewSize(60, 24)
+}
+
+func (r *hoverTableCellRenderer) Refresh() {
+	if r.cell.bg != nil {
+		r.cell.bg.Refresh()
+	}
+	if r.cell.content != nil {
+		r.cell.content.Refresh()
+	}
+}
+
+func (r *hoverTableCellRenderer) BackgroundColor() color.Color {
+	return color.Transparent
+}
+
+func (r *hoverTableCellRenderer) Objects() []fyne.CanvasObject {
+	var objs []fyne.CanvasObject
+	if r.cell.bg != nil {
+		objs = append(objs, r.cell.bg)
+	}
+	if r.cell.content != nil {
+		objs = append(objs, r.cell.content)
+	}
+	return objs
+}
+
+func (r *hoverTableCellRenderer) Destroy() {}
 
 // NewMainWindow 创建主窗口（兼容旧版本）
 func NewMainWindow(app fyne.App) fyne.Window {
@@ -104,25 +218,24 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 			return len(mw.extractionResult.Invoices) + 1, 7 // +1是表头
 		},
 		func() fyne.CanvasObject {
-			// 创建单元格模板，设置最小高度以适应二维码
-			label := widget.NewLabel("")
-			return container.NewCenter(label)
+			// 使用支持鼠标悬停高亮的自定义单元格
+			return NewHoverTableCell()
 		},
 		func(id widget.TableCellID, obj fyne.CanvasObject) {
-			containerObj := obj.(*fyne.Container)
+			cell := obj.(*HoverTableCell)
 
 			// 表头
 			if id.Row == 0 {
 				headers := []string{"序号", "发票号码", "来源", "金额", "发票日期", "收件时间", "二维码"}
-				label := widget.NewLabel(headers[id.Col])
-				label.TextStyle = fyne.TextStyle{Bold: true}
-				containerObj.Objects = []fyne.CanvasObject{label}
+				text := canvas.NewText(headers[id.Col], theme.ForegroundColor())
+				text.TextStyle = fyne.TextStyle{Bold: true}
+				cell.SetContent(text)
 				return
 			}
 
 			// 数据行
 			if mw.extractionResult == nil || id.Row-1 >= len(mw.extractionResult.Invoices) {
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel("")}
+				cell.SetContent(canvas.NewText("", theme.ForegroundColor()))
 				return
 			}
 
@@ -130,17 +243,17 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 
 			switch id.Col {
 			case 0: // 序号
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(fmt.Sprintf("%d", id.Row))}
+				cell.SetContent(canvas.NewText(fmt.Sprintf("%d", id.Row), theme.ForegroundColor()))
 			case 1: // 发票号码
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(invoice.InvoiceNumber)}
+				cell.SetContent(canvas.NewText(invoice.InvoiceNumber, theme.ForegroundColor()))
 			case 2: // 来源
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(invoice.Source)}
+				cell.SetContent(canvas.NewText(invoice.Source, theme.ForegroundColor()))
 			case 3: // 金额
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(fmt.Sprintf("¥%.2f", invoice.TotalAmount))}
+				cell.SetContent(canvas.NewText(fmt.Sprintf("¥%.2f", invoice.TotalAmount), theme.ForegroundColor()))
 			case 4: // 发票日期
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(invoice.Date.Format("2006-01-02"))}
+				cell.SetContent(canvas.NewText(invoice.Date.Format("2006-01-02"), theme.ForegroundColor()))
 			case 5: // 收件时间
-				containerObj.Objects = []fyne.CanvasObject{widget.NewLabel(invoice.EmailDate)}
+				cell.SetContent(canvas.NewText(invoice.EmailDate, theme.ForegroundColor()))
 			case 6: // 二维码
 				// 从缓存获取或生成二维码
 				qrKey := invoice.InvoiceNumber
@@ -154,7 +267,7 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 						mw.qrCodeCache[qrKey] = qrImg
 					}
 				}
-				containerObj.Objects = []fyne.CanvasObject{qrImg}
+				cell.SetContent(qrImg)
 			}
 		},
 	)
