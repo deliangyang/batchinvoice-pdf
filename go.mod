@@ -6,6 +6,7 @@ require (
 	fyne.io/fyne/v2 v2.7.3
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-message v0.18.2
+	github.com/gen2brain/go-fitz v1.24.15
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/pdfcpu/pdfcpu v0.11.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
@@ -17,6 +18,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -36,6 +38,7 @@ require (
 	github.com/hhrutter/tiff v1.0.2 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
+	github.com/jupiterrider/ffi v0.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect

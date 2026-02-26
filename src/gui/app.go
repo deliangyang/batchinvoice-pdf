@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/gen2brain/go-fitz"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -934,22 +936,41 @@ func generatePDFPreview(pdfData []byte) fyne.CanvasObject {
 		return widget.NewLabel("无PDF数据")
 	}
 
-	// 转换PDF为图片
-	processor := core.NewPDFProcessor()
-	images, err := processor.ConvertPDFToImages(pdfData)
+	// 将 PDF 写入临时文件，供 go-fitz 打开
+	tmpFile, err := os.CreateTemp("", "invoice-preview-*.pdf")
 	if err != nil {
-		log.Printf("Failed to convert PDF to images: %v", err)
-		return widget.NewLabel(fmt.Sprintf("PDF转换失败: %v", err))
+		log.Printf("Failed to create temp pdf for preview: %v", err)
+		return widget.NewLabel("PDF预览失败（创建临时文件失败）")
+	}
+	if _, err := tmpFile.Write(pdfData); err != nil {
+		log.Printf("Failed to write temp pdf for preview: %v", err)
+		_ = tmpFile.Close()
+		return widget.NewLabel("PDF预览失败（写入临时文件失败）")
+	}
+	if err := tmpFile.Close(); err != nil {
+		log.Printf("Failed to close temp pdf for preview: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// 使用 go-fitz 渲染整页 PDF 为图像
+	doc, err := fitz.New(tmpFile.Name())
+	if err != nil {
+		log.Printf("Failed to open pdf with go-fitz: %v", err)
+		return widget.NewLabel("PDF预览失败（无法打开文件）")
+	}
+	defer doc.Close()
+
+	if doc.NumPage() == 0 {
+		return widget.NewLabel("PDF没有任何页面")
 	}
 
-	if len(images) == 0 {
-		return widget.NewLabel("无法提取PDF图像")
+	firstPage, err := doc.Image(0)
+	if err != nil {
+		log.Printf("Failed to render pdf page: %v", err)
+		return widget.NewLabel("PDF预览失败（渲染页面出错）")
 	}
 
-	// 使用第一页作为预览
-	firstPage := images[0]
-
-	// 将image.Image转换为PNG字节
+	// 将整页 image.Image 转换为 PNG 字节
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, firstPage); err != nil {
 		log.Printf("Failed to encode image: %v", err)
