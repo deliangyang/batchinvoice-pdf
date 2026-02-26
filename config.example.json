@@ -1,0 +1,12 @@
+{
+  "description": "示例邮箱配置文件 - 注意：现在邮箱配置通过登录界面完成",
+  "note": "请在 main.go 中修改 DefaultEmail 常量来设置默认邮箱地址",
+  "email": {
+    "imap_server": "自动根据邮箱域名识别",
+    "port": 993,
+    "username": "在 main.go 的 DefaultEmail 中配置",
+    "password": "通过登录界面输入"
+  },
+  "max_emails": 20,
+  "tax_rate": 0.13
+}
