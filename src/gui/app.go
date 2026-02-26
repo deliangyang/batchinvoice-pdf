@@ -14,10 +14,10 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"fyne.io/fyne/v2/driver/desktop"
 )
 
 // MainWindow 主窗口
@@ -355,11 +355,11 @@ func (mw *MainWindow) buildSimpleConfigForm(extractBtn, exportBtn *widget.Button
 
 	// 调整输入框宽度，使其更长一些
 	maxEmailsEntryContainer := container.New(
-		layout.NewGridWrapLayout(fyne.NewSize(120, 0)),
+		layout.NewGridWrapLayout(fyne.NewSize(120, 36)),
 		maxEmailsEntry,
 	)
 	taxRateEntryContainer := container.New(
-		layout.NewGridWrapLayout(fyne.NewSize(120, 0)),
+		layout.NewGridWrapLayout(fyne.NewSize(120, 36)),
 		taxRateEntry,
 	)
 
