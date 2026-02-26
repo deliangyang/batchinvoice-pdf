@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/gen2brain/go-fitz"
 
@@ -518,6 +519,7 @@ func (mw *MainWindow) onExtract() {
 				mw.extractionResult.TotalEmails = result.TotalEmails
 				mw.extractionResult.ProcessedPDFs = result.ProcessedPDFs
 				mw.extractionResult.QRCodesFound = result.QRCodesFound
+				mw.extractionResult.ExtractedAt = result.ExtractedAt
 				if len(mw.extractionResult.Invoices) == 0 {
 					mw.extractionResult.Invoices = result.Invoices
 				}
@@ -709,6 +711,7 @@ func (mw *MainWindow) extractInvoices() (*core.ExtractionResult, error) {
 		ProcessedPDFs: processedPDFs,
 		QRCodesFound:  totalQRCodes,
 		Invoices:      invoices,
+		ExtractedAt:   time.Now(),
 	}
 
 	// 完成
@@ -904,8 +907,65 @@ func openPDFWithDefaultViewer(pdfData []byte) {
 
 // onExport 导出按钮点击事件
 func (mw *MainWindow) onExport() {
-	// TODO: 实现导出功能
-	dialog.ShowInformation("导出", "导出功能开发中...", mw.window)
+	if mw.extractionResult == nil || len(mw.extractionResult.Invoices) == 0 {
+		dialog.ShowInformation("导出", "当前没有可导出的发票数据，请先完成一次提取。", mw.window)
+		return
+	}
+
+	formats := []string{"JSON", "HTML", "Markdown"}
+	formatSelector := widget.NewRadioGroup(formats, nil)
+	formatSelector.SetSelected("JSON")
+
+	content := container.NewVBox(
+		widget.NewLabel("请选择导出格式："),
+		formatSelector,
+	)
+
+	dialog.NewCustomConfirm("导出数据", "下一步", "取消", content, func(confirmed bool) {
+		if !confirmed {
+			return
+		}
+
+		format := formatSelector.Selected
+		if format == "" {
+			format = "JSON"
+		}
+
+		dialog.ShowFileSave(func(writer fyne.URIWriteCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, mw.window)
+				return
+			}
+			if writer == nil {
+				// 用户取消
+				return
+			}
+			defer writer.Close()
+
+			var data []byte
+			switch format {
+			case "JSON":
+				data, err = utils.ExportToJSON(mw.extractionResult)
+			case "HTML":
+				data, err = utils.ExportToHTML(mw.extractionResult)
+			case "Markdown":
+				data, err = utils.ExportToMarkdown(mw.extractionResult)
+			default:
+				err = fmt.Errorf("不支持的导出格式: %s", format)
+			}
+			if err != nil {
+				dialog.ShowError(err, mw.window)
+				return
+			}
+
+			if _, err := writer.Write(data); err != nil {
+				dialog.ShowError(err, mw.window)
+				return
+			}
+
+			dialog.ShowInformation("导出成功", fmt.Sprintf("数据已导出到：\n%s", writer.URI().Path()), mw.window)
+		}, mw.window)
+	}, mw.window).Show()
 }
 
 // extractNameFromSubject 从邮件主题提取姓名
