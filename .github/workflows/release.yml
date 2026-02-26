@@ -20,7 +20,7 @@ jobs:
             artifact: batchinvoice-pdf-windows-amd64.exe
           - os: macos-latest
             artifact: batchinvoice-pdf-macos-arm64
-          - os: macos-13
+          - os: macos-15-intel
             artifact: batchinvoice-pdf-macos-amd64
 
     steps:
