@@ -8,24 +8,18 @@ on:
 
 jobs:
   build:
-    name: Build binaries (${{ matrix.goos }}/${{ matrix.goarch }})
+    name: Build binaries (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
             artifact: batchinvoice-pdf-linux-amd64
           - os: windows-latest
-            goos: windows
-            goarch: amd64
             artifact: batchinvoice-pdf-windows-amd64.exe
           - os: macos-latest
-            goos: darwin
-            goarch: amd64
-            artifact: batchinvoice-pdf-macos-amd64
+            artifact: batchinvoice-pdf-macos
 
     steps:
       - name: Checkout
@@ -37,7 +31,7 @@ jobs:
           go-version: "1.24"
 
       - name: Install Linux OpenGL dependencies
-        if: matrix.goos == 'linux'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -48,9 +42,6 @@ jobs:
 
       - name: Build
         shell: bash
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p build
           VERSION="${GITHUB_REF_NAME}"
@@ -58,7 +49,7 @@ jobs:
           GIT_COMMIT="${GITHUB_SHA}"
           LDFLAGS="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}"
           OUT="build/${{ matrix.artifact }}"
-          echo "Building for $GOOS/$GOARCH -> $OUT"
+          echo "Building native binary on $(uname -s)/$(uname -m) -> $OUT"
           go build -v -ldflags "$LDFLAGS" -o "$OUT" main.go
 
       - name: Upload artifact
