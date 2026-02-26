@@ -19,7 +19,9 @@ jobs:
           - os: windows-latest
             artifact: batchinvoice-pdf-windows-amd64.exe
           - os: macos-latest
-            artifact: batchinvoice-pdf-macos
+            artifact: batchinvoice-pdf-macos-arm64
+          - os: macos-13
+            artifact: batchinvoice-pdf-macos-amd64
 
     steps:
       - name: Checkout
