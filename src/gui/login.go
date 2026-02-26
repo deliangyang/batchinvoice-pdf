@@ -98,6 +98,11 @@ func (lw *LoginWindow) buildLoginUI() fyne.CanvasObject {
 	tipLabel := widget.NewLabel("💡 提示：Gmail等邮箱需要使用应用专用密码")
 	tipLabel.Wrapping = fyne.TextWrapWord
 
+	// 帮助入口：如何获取专用密码、授权码及开启 IMAP
+	helpBtn := widget.NewButton("如何获取专用密码、授权码/开启IMAP？", func() {
+		lw.showIMAPHelp()
+	})
+
 	// 登录按钮
 	loginBtn := widget.NewButton("登录", func() {
 		lw.handleLogin(passwordEntry.Text, imapConfig, rememberPasswordCheck.Checked)
@@ -120,6 +125,7 @@ func (lw *LoginWindow) buildLoginUI() fyne.CanvasObject {
 		imapInfo,
 		widget.NewLabel(""),
 		tipLabel,
+		helpBtn,
 	)
 
 	content := container.NewBorder(
@@ -210,4 +216,62 @@ func (lw *LoginWindow) handleLogin(password string, imapConfig IMAPServerConfig,
 			}
 		})
 	}()
+}
+
+// showIMAPHelp 显示如何获取专用密码和开启 IMAP 的说明（仅保留登录和使用说明，使用新窗口）
+func (lw *LoginWindow) showIMAPHelp() {
+	// 只保留与登录、使用相关的简明说明，使用 Markdown 排版
+	mdContent := `# 登录说明
+
+1. 打开 BatchInvoice PDF 程序后，会先看到登录界面。  
+2. 界面会显示预设的邮箱账号（不可编辑），并自动识别 IMAP 服务器。  
+3. 在「邮箱密码」处输入：  
+   - Gmail：应用专用密码（需先开启两步验证并生成应用密码）；  
+   - QQ 邮箱：开启 IMAP/SMTP 后生成的授权码；  
+   - 163/126：开启 IMAP 后生成的客户端授权密码；  
+   - 其他邮箱：在已开启 IMAP 的前提下使用登录密码或该邮箱提供的专用密码。  
+4. 如需下次自动填充，可勾选「记住密码」。  
+5. 点击「登录」按钮或按回车键，等待邮箱连接验证完成。  
+
+# 使用说明
+
+1. 登录成功后会自动打开主界面。  
+2. 确认界面中显示的邮箱账号无误。  
+3. 根据需要调整：  
+   - 最大邮件数（默认 30，仅处理最近 31 天内的邮件）；  
+   - 税率（默认 0.13）。  
+4. 点击「🚀 开始提取」按钮，等待进度条完成。  
+5. 在发票列表中查看提取结果，点击某一条可查看发票详情与二维码。  
+6. 需要保存结果时，可点击「📥 导出数据」，选择 JSON / HTML / Markdown 格式导出。  
+`
+
+	// 创建新的帮助窗口，而不是弹出层
+	win := lw.app.NewWindow("如何获取专用密码、授权码/开启 IMAP")
+	win.Resize(fyne.NewSize(900, 650))
+	win.CenterOnScreen()
+
+	rich := widget.NewRichTextFromMarkdown(mdContent)
+
+	content := container.NewBorder(
+		container.NewVBox(
+			widget.NewLabelWithStyle(
+				"登录帮助：如何获取专用密码、授权码以及开启 IMAP",
+				fyne.TextAlignCenter,
+				fyne.TextStyle{Bold: true},
+			),
+			widget.NewSeparator(),
+		),
+		container.NewVBox(
+			widget.NewSeparator(),
+			widget.NewButton("关闭", func() {
+				win.Close()
+			}),
+		),
+		nil,
+		nil,
+		container.NewScroll(rich),
+	)
+
+	win.SetContent(container.NewPadded(content))
+	win.Show()
 }

@@ -963,9 +963,46 @@ func (mw *MainWindow) onExport() {
 				return
 			}
 
+			// 如果是 Markdown，同步在应用内以排版方式展示内容，避免用户再去打开文件
+			if format == "Markdown" {
+				mw.showMarkdownExportPreview(data)
+			}
+
 			dialog.ShowInformation("导出成功", fmt.Sprintf("数据已导出到：\n%s", writer.URI().Path()), mw.window)
 		}, mw.window)
 	}, mw.window).Show()
+}
+
+// showMarkdownExportPreview 以排版方式展示导出的 Markdown 内容
+func (mw *MainWindow) showMarkdownExportPreview(data []byte) {
+	win := mw.app.NewWindow("Markdown 导出预览")
+	win.Resize(fyne.NewSize(900, 600))
+	win.CenterOnScreen()
+
+	rich := widget.NewRichTextFromMarkdown(string(data))
+
+	content := container.NewBorder(
+		container.NewVBox(
+			widget.NewLabelWithStyle(
+				"📄 Markdown 导出预览",
+				fyne.TextAlignCenter,
+				fyne.TextStyle{Bold: true},
+			),
+			widget.NewSeparator(),
+		),
+		container.NewVBox(
+			widget.NewSeparator(),
+			widget.NewButton("关闭", func() {
+				win.Close()
+			}),
+		),
+		nil,
+		nil,
+		container.NewScroll(rich),
+	)
+
+	win.SetContent(container.NewPadded(content))
+	win.Show()
 }
 
 // extractNameFromSubject 从邮件主题提取姓名
