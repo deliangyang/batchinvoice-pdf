@@ -22,6 +22,7 @@ func main() {
 	// 创建 Fyne 应用
 	a := app.NewWithID("com.batchinvoice.pdf")
 	a.Settings().SetTheme(&gui.CustomTheme{})
+	a.SetIcon(gui.GetAppIcon())
 
 	// 创建登录窗口
 	loginWindow := gui.NewLoginWindow(a, DefaultEmail, func(config *core.Config) {

@@ -25,7 +25,7 @@ build:
 	$(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) main.go
 	@echo "✅ Build complete: $(BUILD_DIR)/$(APP_NAME)"
 
-# Build for all platforms
+# Build for all platforms (only current OS - Fyne uses CGO/OpenGL, no cross-compile)
 build-all:
 	@chmod +x build.sh
 	@./build.sh
@@ -62,7 +62,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make deps       - Install dependencies"
 	@echo "  make build      - Build for current platform"
-	@echo "  make build-all  - Build for all platforms"
+	@echo "  make build-all  - Build for current platform (Fyne cannot cross-compile)"
 	@echo "  make run        - Run the application"
 	@echo "  make test       - Run tests"
 	@echo "  make clean      - Clean build artifacts"
