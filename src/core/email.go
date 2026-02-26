@@ -65,7 +65,7 @@ func (e *EmailClient) Disconnect() {
 	}
 }
 
-// FetchRecentEmails 获取最近的邮件（从新到旧，限制最近5天）
+// FetchRecentEmails 获取最近的邮件（从新到旧，限制最近31天）
 func (e *EmailClient) FetchRecentEmails(maxEmails int) ([]*EmailMessage, error) {
 	// 选择收件箱
 	mbox, err := e.client.Select("INBOX", false)
@@ -77,12 +77,12 @@ func (e *EmailClient) FetchRecentEmails(maxEmails int) ([]*EmailMessage, error) 
 		return []*EmailMessage{}, nil
 	}
 
-	// 搜索最近5天的邮件
-	fiveDaysAgo := time.Now().AddDate(0, 0, -5)
+	// 搜索最近31天的邮件
+	thirtyOneDaysAgo := time.Now().AddDate(0, 0, -31)
 	criteria := imap.NewSearchCriteria()
-	criteria.Since = fiveDaysAgo
+	criteria.Since = thirtyOneDaysAgo
 
-	log.Printf("Searching emails since %s (total messages in mailbox: %d)", fiveDaysAgo.Format("2006-01-02"), mbox.Messages)
+	log.Printf("Searching emails since %s (total messages in mailbox: %d)", thirtyOneDaysAgo.Format("2006-01-02"), mbox.Messages)
 
 	// 执行搜索
 	seqNums, err := e.client.Search(criteria)
@@ -91,11 +91,11 @@ func (e *EmailClient) FetchRecentEmails(maxEmails int) ([]*EmailMessage, error) 
 	}
 
 	if len(seqNums) == 0 {
-		log.Println("No emails found in the last 5 days")
+		log.Println("No emails found in the last 31 days")
 		return []*EmailMessage{}, nil
 	}
 
-	log.Printf("Found %d emails in the last 5 days", len(seqNums))
+	log.Printf("Found %d emails in the last 31 days", len(seqNums))
 
 	// 按序号从大到小排序（最新的在前）
 	sort.Slice(seqNums, func(i, j int) bool {
@@ -152,7 +152,7 @@ func (e *EmailClient) FetchRecentEmails(maxEmails int) ([]*EmailMessage, error) 
 		result = append(result, emailMap[seqNum])
 	}
 
-	log.Printf("✓ Successfully fetched %d emails from the last 5 days (newest first)", len(result))
+	log.Printf("✓ Successfully fetched %d emails from the last 31 days (newest first)", len(result))
 
 	return result, nil
 }

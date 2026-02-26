@@ -43,7 +43,7 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{
 		Port:      993,
-		MaxEmails: 20,
+		MaxEmails: 30,
 		TaxRate:   0.13,
 	}
 }

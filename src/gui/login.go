@@ -113,7 +113,6 @@ func (lw *LoginWindow) buildLoginUI() fyne.CanvasObject {
 	form := container.NewVBox(
 		widget.NewLabel("邮箱账号"),
 		emailLabel,
-		widget.NewLabel(""),
 		widget.NewLabel("邮箱密码"),
 		passwordEntry,
 		rememberPasswordCheck,
@@ -156,7 +155,7 @@ func (lw *LoginWindow) handleLogin(password string, imapConfig IMAPServerConfig,
 		Port:       imapConfig.Port,
 		Username:   lw.email,
 		Password:   password,
-		MaxEmails:  20,
+		MaxEmails:  30,
 		TaxRate:    0.13,
 	}
 
