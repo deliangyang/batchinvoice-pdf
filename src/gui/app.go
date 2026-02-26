@@ -8,6 +8,9 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -823,9 +826,14 @@ func (mw *MainWindow) showInvoiceDetail(invoice core.Invoice) {
 		qrCodeEntry,
 	)
 
+	openPDFBtn := widget.NewButton("在系统中打开PDF", func() {
+		openPDFWithDefaultViewer(invoice.PDFData)
+	})
+
 	rightPanel := container.NewVBox(
 		widget.NewLabel("发票预览："),
 		pdfPreview,
+		openPDFBtn,
 	)
 
 	mainContent := container.NewHSplit(
@@ -854,6 +862,42 @@ func (mw *MainWindow) showInvoiceDetail(invoice core.Invoice) {
 
 	detailWindow.SetContent(container.NewPadded(content))
 	detailWindow.Show()
+}
+
+// openPDFWithDefaultViewer 使用系统默认PDF查看器打开PDF
+func openPDFWithDefaultViewer(pdfData []byte) {
+	if len(pdfData) == 0 {
+		log.Println("no PDF data to open")
+		return
+	}
+
+	tmpFile, err := os.CreateTemp("", "invoice-*.pdf")
+	if err != nil {
+		log.Printf("failed to create temp pdf file: %v", err)
+		return
+	}
+	if _, err := tmpFile.Write(pdfData); err != nil {
+		log.Printf("failed to write temp pdf file: %v", err)
+		_ = tmpFile.Close()
+		return
+	}
+	if err := tmpFile.Close(); err != nil {
+		log.Printf("failed to close temp pdf file: %v", err)
+	}
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", tmpFile.Name())
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", tmpFile.Name())
+	default:
+		cmd = exec.Command("xdg-open", tmpFile.Name())
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.Printf("failed to open pdf with default viewer: %v", err)
+	}
 }
 
 // onExport 导出按钮点击事件
