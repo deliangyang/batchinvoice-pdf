@@ -18,6 +18,8 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: batchinvoice-pdf-linux-amd64
+          - os: ubuntu-22.04
+            artifact: batchinvoice-pdf-linux-amd64-ubuntu22
           - os: windows-latest
             artifact: batchinvoice-pdf-windows-amd64.exe
           - os: macos-latest
@@ -35,7 +37,7 @@ jobs:
           go-version: "1.24"
 
       - name: Install Linux OpenGL dependencies
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \

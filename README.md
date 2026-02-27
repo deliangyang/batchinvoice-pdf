@@ -48,6 +48,21 @@ go build -o build/batchinvoice-pdf-macos main.go
 go build -o build/batchinvoice-pdf-linux main.go
 ```
 
+若使用 **预编译的 Linux 二进制** 时出现 `GLIBC_2.38 not found` 等错误，说明当前系统 glibc 较旧。请在本机从源码构建（会使用本机 glibc）：
+
+```bash
+# 安装构建依赖（Ubuntu/Debian）
+sudo apt-get update
+sudo apt-get install -y build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libxi-dev
+
+# 在项目根目录执行
+go mod download
+./build.sh
+# 或：go build -o build/batchinvoice-pdf-linux-amd64 main.go
+```
+
+构建产物在 `build/` 目录，直接运行即可。
+
 ## 使用方法
 
 1. 启动程序
