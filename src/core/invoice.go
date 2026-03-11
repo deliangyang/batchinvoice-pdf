@@ -102,7 +102,7 @@ var (
 		},
 		{
 			name:     "京东",
-			keywords: []string{"京东", "JD", "jd"},
+			keywords: []string{"京东", "JD", "jd", "jd.com", "JD.COM", "京东商城", "京东集团", "jingdong", "Jingdong"},
 		},
 		{
 			name:     "淘宝",

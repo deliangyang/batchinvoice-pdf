@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -162,6 +164,7 @@ type EmailMessage struct {
 	Subject     string
 	From        string
 	Date        string
+	Body        string // 邮件正文
 	Attachments []Attachment
 }
 
@@ -207,7 +210,10 @@ func (e *EmailClient) parseMessage(msg *imap.Message) (*EmailMessage, error) {
 		emailMsg.From = from[0].Address
 	}
 
-	// 解析附件
+	// 解析邮件正文和附件
+	var bodyText string
+	var bodyHTML string
+
 	for {
 		p, err := mr.NextPart()
 		if err == io.EOF {
@@ -238,8 +244,149 @@ func (e *EmailClient) parseMessage(msg *imap.Message) (*EmailMessage, error) {
 				})
 				log.Printf("Found PDF attachment: %s (%d bytes)", filename, len(data))
 			}
+		case *mail.InlineHeader:
+			// 读取邮件正文
+			contentType, _, _ := h.ContentType()
+			body, err := io.ReadAll(p.Body)
+			if err != nil {
+				log.Printf("Failed to read body: %v", err)
+				continue
+			}
+
+			if strings.HasPrefix(contentType, "text/plain") {
+				bodyText = string(body)
+			} else if strings.HasPrefix(contentType, "text/html") {
+				bodyHTML = string(body)
+			}
+		}
+	}
+
+	// 使用HTML正文优先，如果没有则使用纯文本
+	if bodyHTML != "" {
+		emailMsg.Body = bodyHTML
+	} else if bodyText != "" {
+		emailMsg.Body = bodyText
+	}
+
+	// 从邮件正文中提取PDF链接并下载
+	if emailMsg.Body != "" {
+		pdfLinks := extractPDFLinks(emailMsg.Body)
+		for i, link := range pdfLinks {
+			log.Printf("Found PDF link in email body: %s", link)
+			pdfData, err := downloadPDF(link)
+			if err != nil {
+				log.Printf("Failed to download PDF from link %s: %v", link, err)
+				continue
+			}
+
+			// 生成文件名 - 根据主题或链接判断是否为京东发票
+			filename := fmt.Sprintf("invoice_%d.pdf", i+1)
+			isJD := strings.Contains(strings.ToLower(subject), "京东") ||
+				strings.Contains(strings.ToLower(subject), "jd") ||
+				(strings.Contains(strings.ToLower(link), "oss") && strings.Contains(strings.ToLower(link), "invoice"))
+
+			if isJD {
+				filename = fmt.Sprintf("jd_invoice_%d.pdf", i+1)
+			}
+
+			emailMsg.Attachments = append(emailMsg.Attachments, Attachment{
+				Filename: filename,
+				Data:     pdfData,
+			})
+			log.Printf("Downloaded PDF from body link: %s (%d bytes)", filename, len(pdfData))
 		}
 	}
 
 	return emailMsg, nil
+}
+
+// extractPDFLinks 从邮件正文中提取PDF链接
+func extractPDFLinks(body string) []string {
+	var links []string
+
+	// 匹配各种PDF链接格式（按优先级排序）
+	patterns := []string{
+		// 京东专用：包含oss、invoice和.pdf的链接（最高优先级）
+		`https?://[^\s<>"]+oss[^\s<>"]+invoice[^\s<>"]+\.pdf[^\s<>"]*`,
+		`https?://[^\s<>"]+invoice[^\s<>"]+oss[^\s<>"]+\.pdf[^\s<>"]*`,
+		// 包含oss和invoice但不一定有.pdf后缀的链接（兼容性）
+		`https?://[^\s<>"]+oss[^\s<>"]+invoice[^\s<>"]+`,
+		`https?://[^\s<>"]+invoice[^\s<>"]+oss[^\s<>"]+`,
+		// 直接的PDF URL
+		`https?://[^\s<>"]+\.pdf[^\s<>"]*`,
+		// 可能包含PDF参数的URL
+		`https?://[^\s<>"]+[?&](?:file|download|pdf)[^\s<>"]*`,
+		// href属性中的链接（京东格式）
+		`href=["']([^"']+oss[^"']+invoice[^"']+\.pdf[^"']*)["']`,
+		`href=["']([^"']+invoice[^"']+oss[^"']+\.pdf[^"']*)["']`,
+		`href=["']([^"']+oss[^"']+invoice[^"']*)["']`,
+		`href=["']([^"']+invoice[^"']+oss[^"']*)["']`,
+		// href属性中的链接（通用格式）
+		`href=["']([^"']+\.pdf[^"']*)["']`,
+		`href=["']([^"']+(?:file|download|pdf)[^"']*)["']`,
+	}
+
+	seenLinks := make(map[string]bool)
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(`(?i)` + pattern) // 不区分大小写
+		matches := re.FindAllStringSubmatch(body, -1)
+
+		for _, match := range matches {
+			link := match[0]
+			// 如果是从href提取的，使用捕获组
+			if len(match) > 1 && match[1] != "" {
+				link = match[1]
+			}
+
+			// 清理链接
+			link = strings.Trim(link, `"'<> `)
+			if strings.HasPrefix(link, "href=") {
+				continue
+			}
+
+			// 去重
+			if !seenLinks[link] && (strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://")) {
+				links = append(links, link)
+				seenLinks[link] = true
+			}
+		}
+	}
+
+	return links
+}
+
+// downloadPDF 下载PDF文件
+func downloadPDF(url string) ([]byte, error) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	// set headers
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// 验证是否是PDF文件
+	if len(data) < 4 || strings.ToUpper(string(data[:4])) != "%PDF" {
+		return nil, fmt.Errorf("downloaded file is not a valid PDF")
+	}
+
+	return data, nil
 }
