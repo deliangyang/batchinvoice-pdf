@@ -27,8 +27,9 @@ func (p *PDFProcessor) ExtractImages(pdfData []byte) ([]image.Image, error) {
 	// 使用pdfcpu提取图像
 	reader := bytes.NewReader(pdfData)
 
-	// 配置
+	// 配置 - 使用宽松验证模式以支持CJK字体
 	conf := model.NewDefaultConfiguration()
+	conf.ValidationMode = model.ValidationRelaxed
 
 	// 解析PDF
 	ctx, err := api.ReadContext(reader, conf)
@@ -36,7 +37,7 @@ func (p *PDFProcessor) ExtractImages(pdfData []byte) ([]image.Image, error) {
 		return nil, fmt.Errorf("failed to read PDF: %w", err)
 	}
 
-	// 验证PDF
+	// 验证PDF（使用宽松模式，跳过字体检查）
 	if err := api.ValidateContext(ctx); err != nil {
 		return nil, fmt.Errorf("invalid PDF: %w", err)
 	}
@@ -100,7 +101,9 @@ func (p *PDFProcessor) ConvertPDFToImages(pdfData []byte) ([]image.Image, error)
 		return nil, fmt.Errorf("failed to create images dir: %w", err)
 	}
 
+	// 配置 - 使用宽松验证模式以支持CJK字体
 	conf := model.NewDefaultConfiguration()
+	conf.ValidationMode = model.ValidationRelaxed
 	// 选中所有页面
 	selectedPages := []string{}
 	if err := api.ExtractImagesFile(pdfPath, imagesDir, selectedPages, conf); err != nil {
