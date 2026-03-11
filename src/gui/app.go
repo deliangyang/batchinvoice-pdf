@@ -219,9 +219,9 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 	mw.invoiceList = widget.NewTable(
 		func() (int, int) {
 			if mw.extractionResult == nil {
-				return 1, 7 // 1行表头，7列
+				return 1, 8 // 1行表头，8列
 			}
-			return len(mw.extractionResult.Invoices) + 1, 7 // +1是表头
+			return len(mw.extractionResult.Invoices) + 1, 8 // +1是表头
 		},
 		func() fyne.CanvasObject {
 			// 使用支持鼠标悬停高亮的自定义单元格
@@ -232,7 +232,7 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 
 			// 表头
 			if id.Row == 0 {
-				headers := []string{"序号", "发票号码", "来源", "金额", "发票日期", "收件时间", "二维码"}
+				headers := []string{"序号", "发票号码", "来源", "税务局", "金额", "发票日期", "收件时间", "二维码"}
 				text := canvas.NewText(headers[id.Col], theme.ForegroundColor())
 				text.TextStyle = fyne.TextStyle{Bold: true}
 				cell.SetContent(text)
@@ -254,13 +254,15 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 				cell.SetContent(canvas.NewText(invoice.InvoiceNumber, theme.ForegroundColor()))
 			case 2: // 来源
 				cell.SetContent(canvas.NewText(invoice.Source, theme.ForegroundColor()))
-			case 3: // 金额
+			case 3: // 税务局
+				cell.SetContent(canvas.NewText(invoice.TaxBureauName, theme.ForegroundColor()))
+			case 4: // 金额
 				cell.SetContent(canvas.NewText(fmt.Sprintf("¥%.2f", invoice.TotalAmount), theme.ForegroundColor()))
-			case 4: // 发票日期
+			case 5: // 发票日期
 				cell.SetContent(canvas.NewText(invoice.Date.Format("2006-01-02"), theme.ForegroundColor()))
-			case 5: // 收件时间
+			case 6: // 收件时间
 				cell.SetContent(canvas.NewText(invoice.EmailDate, theme.ForegroundColor()))
-			case 6: // 二维码
+			case 7: // 二维码
 				// 从缓存获取或生成二维码
 				qrKey := invoice.InvoiceNumber
 				qrImg, exists := mw.qrCodeCache[qrKey]
@@ -282,10 +284,11 @@ func (mw *MainWindow) buildUI() fyne.CanvasObject {
 	mw.invoiceList.SetColumnWidth(0, 60)  // 序号
 	mw.invoiceList.SetColumnWidth(1, 200) // 发票号码
 	mw.invoiceList.SetColumnWidth(2, 120) // 来源
-	mw.invoiceList.SetColumnWidth(3, 100) // 金额
-	mw.invoiceList.SetColumnWidth(4, 100) // 发票日期
-	mw.invoiceList.SetColumnWidth(5, 180) // 收件时间
-	mw.invoiceList.SetColumnWidth(6, 100) // 二维码
+	mw.invoiceList.SetColumnWidth(3, 200) // 税务局
+	mw.invoiceList.SetColumnWidth(4, 100) // 金额
+	mw.invoiceList.SetColumnWidth(5, 100) // 发票日期
+	mw.invoiceList.SetColumnWidth(6, 180) // 收件时间
+	mw.invoiceList.SetColumnWidth(7, 100) // 二维码
 
 	// 表格点击事件
 	mw.invoiceList.OnSelected = func(id widget.TableCellID) {
@@ -647,12 +650,16 @@ func (mw *MainWindow) extractInvoices() (*core.ExtractionResult, error) {
 
 			// 处理每个二维码
 			for qrIdx, qrData := range qrcodes {
-				// 解析二维码数据
-				invoiceNum, amount, date, err := core.ParseQRCodeData(qrData)
+				// 解析二维码数据（包含税务局代码）
+				parser := core.NewQRCodeParser()
+				invoiceNum, amount, date, taxBureauCode, err := parser.ParseWithTaxBureau(qrData)
 				if err != nil {
 					log.Printf("    [二维码 %d] ❌ 解析失败: %v", qrIdx+1, err)
 					continue
 				}
+
+				// 获取税务局名称
+				taxBureauName := core.GetTaxBureauName(taxBureauCode)
 
 				// 计算税额
 				amountNoTax, taxAmount := utils.CalculateTax(amount, mw.config.TaxRate)
@@ -668,6 +675,8 @@ func (mw *MainWindow) extractInvoices() (*core.ExtractionResult, error) {
 					TotalAmount:   amount,
 					AmountNoTax:   amountNoTax,
 					TaxAmount:     taxAmount,
+					TaxBureauCode: taxBureauCode,
+					TaxBureauName: taxBureauName,
 					EmailSubject:  msg.Subject,
 					FileName:      attachment.Filename,
 					EmailDate:     msg.Date,
@@ -676,8 +685,8 @@ func (mw *MainWindow) extractInvoices() (*core.ExtractionResult, error) {
 
 				invoices = append(invoices, invoice)
 				currentIndex := len(invoices)
-				log.Printf("    [发票 %d] ✅ %s | %s | ¥%.2f | %s",
-					currentIndex, invoiceNum, source, amount, date.Format("2006-01-02"))
+				log.Printf("    [发票 %d] ✅ %s | %s | %s | ¥%.2f | %s",
+					currentIndex, invoiceNum, source, taxBureauName, amount, date.Format("2006-01-02"))
 
 				// 增量更新界面：每解析一张发票就立刻添加到列表中
 				fyne.Do(func() {
